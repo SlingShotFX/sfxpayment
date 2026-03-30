@@ -1,0 +1,15 @@
+{
+  "port": 5011,
+  "account": 1736,
+  "server": "ATFXGM16-LIVE",
+  "terminal_path": "C:\\Users\\kkayg\\SFX\\slingshotrobot\\ExoMarkets\\1\\MetaTrader 5 1\\terminal64.exe",
+  "password": "Jackie26.",
+  "server_name": "ProxyServer_5001",
+  "master_url": "http://localhost:5123",
+  "forward_to_master": true,
+  "master_balance": 10000,
+  "comment": "German Auto",
+  "start_paused": false,
+  "sfx_key": "sfx567011",
+  "created_at": "2026-02-25T17:28:32.690361"
+}

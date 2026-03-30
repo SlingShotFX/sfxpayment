@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <base href="/sfxpayments/">
+    <title>SlingShotFX - Forex Bot Manager</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://www.paypal.com/sdk/js?client-id=AbCVKjAW7ky8DOnk-MxmykCEVxaFVbhzErbkTSeAJLdTS4VaLYgsJWRWAQtvNoJ-oDKv7apvofYJfYJb&vault=true&intent=subscription" data-sdk-integration-source="button-factory"></script>
+    <style>
+        /* same styling as before – unchanged */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2c2c2c 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(20, 20, 20, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: 30px;
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 215, 0, 0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(90deg, #000000 0%, #DD0000 50%, #FFCC00 100%);
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            color: white;
+            font-size: 1.8rem;
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        .header i {
+            margin-right: 10px;
+            font-size: 2rem;
+            vertical-align: middle;
+            color: #FFCC00;
+        }
+        .content {
+            padding: 30px;
+        }
+        .input-group {
+            display: flex;
+            align-items: center;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50px;
+            padding: 5px 15px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(255,215,0,0.5);
+        }
+        .input-group i {
+            color: #FFCC00;
+            font-size: 1.2rem;
+            width: 30px;
+        }
+        .input-group input {
+            background: transparent;
+            border: none;
+            padding: 12px 0;
+            color: white;
+            font-size: 1rem;
+            width: 100%;
+            outline: none;
+        }
+        button {
+            background: linear-gradient(90deg, #000000, #333333);
+            color: #FFCC00;
+            border: none;
+            padding: 12px;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid #FFCC00;
+            width: 100%;
+        }
+        button:hover {
+            background: linear-gradient(90deg, #333333, #000000);
+            transform: scale(1.02);
+            box-shadow: 0 0 15px rgba(255,215,0,0.5);
+        }
+        .error {
+            color: #ff6b6b;
+            text-align: center;
+            margin-top: 10px;
+        }
+        .dashboard {
+            display: none;
+        }
+        .login-container {
+            display: block;
+        }
+        .bots-section, .accounts-section {
+            margin: 20px 0;
+        }
+        .bot-card {
+            background: rgba(0,0,0,0.5);
+            border-radius: 15px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #FFCC00;
+        }
+        .bot-name {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #FFCC00;
+        }
+        .bot-status {
+            font-size: 0.9rem;
+            margin: 5px 0;
+            color: #ccc;
+        }
+        .bot-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .bot-actions button {
+            flex: 1;
+            padding: 8px;
+            font-size: 0.9rem;
+        }
+        .activate-btn {
+            background: linear-gradient(90deg, #006600, #009900);
+            border-color: #00cc00;
+            color: white;
+        }
+        .cancel-btn {
+            background: linear-gradient(90deg, #660000, #990000);
+            border-color: #ff4444;
+            color: white;
+        }
+        .delete-btn {
+            background: linear-gradient(90deg, #333, #222);
+            border-color: #FFCC00;
+        }
+        .add-bot-form {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+        }
+        .add-bot-form input {
+            flex: 1;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid #FFCC00;
+            border-radius: 50px;
+            padding: 10px 15px;
+            color: white;
+            outline: none;
+        }
+        .add-bot-form button {
+            width: auto;
+            padding: 10px 20px;
+        }
+        .risk-warning {
+            background: rgba(255,0,0,0.2);
+            border-left: 4px solid #ff4444;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            color: #ffaaaa;
+        }
+        .contact-section, .accounts-section {
+            background: rgba(0,0,0,0.4);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid rgba(255,215,0,0.3);
+        }
+        .contact-section h3, .accounts-section h3 {
+            color: #FFCC00;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .contact-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #ddd;
+            font-size: 0.95rem;
+        }
+        .contact-item i {
+            width: 25px;
+            color: #FFCC00;
+            font-size: 1.2rem;
+        }
+        .contact-item a {
+            color: #FFCC00;
+            text-decoration: none;
+        }
+        .contact-item a:hover {
+            text-decoration: underline;
+        }
+        .support-hours {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255,215,0,0.2);
+            font-size: 0.85rem;
+            color: #ccc;
+        }
+        .accounts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, auto));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .account-item {
+            background: rgba(255,255,255,0.1);
+            padding: 8px 12px;
+            border-radius: 8px;
+            text-align: center;
+            font-family: monospace;
+            font-size: 0.9rem;
+            color: #FFCC00;
+        }
+        .logout-btn {
+            background: linear-gradient(90deg, #660000, #990000);
+            border-color: #ff4444;
+            color: white;
+            margin-top: 20px;
+        }
+        .loading {
+            text-align: center;
+            color: #FFCC00;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+<div class="container" id="app">
+    <div class="header">
+        <h1><i class="fas fa-robot"></i> SlingShotFX</h1>
+    </div>
+    <div class="content">
+        <!-- Login View -->
+        <div id="login-view" class="login-container">
+            <div class="input-group">
+                <i class="fas fa-user"></i>
+                <input type="text" id="username" placeholder="Username">
+            </div>
+            <div class="input-group">
+                <i class="fas fa-lock"></i>
+                <input type="password" id="password" placeholder="Password">
+            </div>
+            <button id="login-btn">Login <i class="fas fa-arrow-right"></i></button>
+            <div id="login-error" class="error"></div>
+        </div>
+
+        <!-- Dashboard View -->
+        <div id="dashboard-view" class="dashboard">
+            
+
+            <div class="add-bot-form">
+                <input type="text" id="new-bot-name" placeholder="Bot name (e.g., EUR/USD Bot)">
+                <button id="add-bot-btn">Add Bot <i class="fas fa-plus"></i></button>
+            </div>
+
+            <div class="bots-section">
+                <h3 style="color:#FFCC00;"><i class="fas fa-robot"></i> Your Bots</h3>
+                <div id="bots-list">Loading...</div>
+            </div>
+
+            <div class="accounts-section">
+                <h3><i class="fas fa-database"></i> Available EXO Markets Accounts</h3>
+                <div id="accounts-list">Loading accounts...</div>
+            </div>
+
+            <div class="contact-section">
+                <h3><i class="fas fa-headset"></i> Need Help? Contact Our Support Team</h3>
+                <div class="contact-details">
+                    <div class="contact-item">
+                        <i class="fas fa-envelope"></i>
+                        <span>Email: <a href="mailto:slingshotfxrobot@gmail.com">slingshotfxrobot@gmail.com</a></span>
+                    </div>
+                    <div class="contact-item">
+                        <i class="fas fa-phone-alt"></i>
+                        <span>Phone: +27 60 142 6909</span>
+                    </div>
+                    <div class="contact-item">
+                        <i class="fab fa-whatsapp"></i>
+                        <span>WhatsApp: +27 60 142 6909</span>
+                    </div>
+                </div>
+                <div class="support-hours">
+                    <i class="fas fa-clock"></i> Support Hours: Monday – Friday, 9:00 AM – 6:00 PM (EST)<br>
+                    <i class="fas fa-exclamation-circle"></i> For urgent issues outside business hours, please email us and we will respond within 24 hours.
+                </div>
+            </div>
+            <div class="risk-warning">
+                <i class="fas fa-exclamation-triangle"></i> <strong>Risk Warning:</strong> Forex trading involves substantial risk of loss and is not suitable for all investors. Past performance is not indicative of future results. You should carefully consider your financial situation and risk tolerance before trading.
+            </div>
+
+            <button id="logout-btn" class="logout-btn">Logout <i class="fas fa-sign-out-alt"></i></button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Routing helpers
+    const loginView = document.getElementById('login-view');
+    const dashboardView = document.getElementById('dashboard-view');
+    const loginError = document.getElementById('login-error');
+    const botsListDiv = document.getElementById('bots-list');
+    const accountsListDiv = document.getElementById('accounts-list');
+
+    function showLogin() {
+        loginView.style.display = 'block';
+        dashboardView.style.display = 'none';
+        window.history.pushState({}, '', '/');
+    }
+
+    function showDashboard() {
+        loginView.style.display = 'none';
+        dashboardView.style.display = 'block';
+        window.history.pushState({}, '', '/dashboard');
+        loadBots();
+        loadAccounts();
+    }
+
+    // Check if user is logged in
+    async function checkAuth() {
+        const res = await fetch('/api/bots', { credentials: 'include' });
+        if (res.status === 401) {
+            showLogin();
+        } else {
+            // If the URL path is /dashboard, show dashboard; otherwise show login
+            // Note: because of <base>, the pathname will be '/dashboard' or '/'
+            const path = window.location.pathname;
+            if (path === '/dashboard') {
+                showDashboard();
+            } else {
+                // If logged in but not on dashboard path, redirect to dashboard
+                window.location.href = '/dashboard';
+            }
+        }
+    }
+
+    async function loadBots() {
+        botsListDiv.innerHTML = '<div class="loading">Loading bots...</div>';
+        const res = await fetch('/api/bots', { credentials: 'include' });
+        const bots = await res.json();
+        if (bots.length === 0) {
+            botsListDiv.innerHTML = '<p style="color:#aaa;">No bots added yet. Add one above.</p>';
+            return;
+        }
+        botsListDiv.innerHTML = bots.map(bot => `
+            <div class="bot-card" data-id="${bot.id}">
+                <div class="bot-name"><i class="fas fa-microchip"></i> ${escapeHtml(bot.name)}</div>
+                <div class="bot-status">
+                    Status: ${bot.subscription_status === 'active' ? '<span style="color:#00ff00;">Active</span>' : '<span style="color:#ffaa00;">Inactive</span>'}
+                    ${bot.subscription_status === 'active' ? ' (Monthly Subscription)' : ''}
+                </div>
+                <div class="bot-actions">
+                    ${bot.subscription_status === 'active' ? `
+                        <button class="cancel-btn" data-id="${bot.id}" data-action="cancel">Cancel Subscription</button>
+                    ` : `
+                        <button class="activate-btn" data-id="${bot.id}" data-action="activate">Activate ($30/month)</button>
+                    `}
+                    <button class="delete-btn" data-id="${bot.id}" data-action="delete">Delete Bot</button>
+                </div>
+            </div>
+        `).join('');
+
+        document.querySelectorAll('.activate-btn').forEach(btn => {
+            btn.addEventListener('click', () => activateBot(btn.dataset.id));
+        });
+        document.querySelectorAll('.cancel-btn').forEach(btn => {
+            btn.addEventListener('click', () => cancelSubscription(btn.dataset.id));
+        });
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', () => deleteBot(btn.dataset.id));
+        });
+    }
+
+    async function loadAccounts() {
+        accountsListDiv.innerHTML = '<div class="loading">Loading accounts...</div>';
+        try {
+            const res = await fetch('/api/accounts', { credentials: 'include' });
+            if (!res.ok) throw new Error();
+            const accounts = await res.json();
+            if (accounts.length === 0) {
+                accountsListDiv.innerHTML = '<p style="color:#aaa;">No accounts available.</p>';
+                return;
+            }
+            accountsListDiv.innerHTML = `
+                <div class="accounts-grid">
+                    ${accounts.map(acc => `<div class="account-item">${escapeHtml(acc)}</div>`).join('')}
+                </div>
+            `;
+        } catch (err) {
+            accountsListDiv.innerHTML = '<p style="color:#ff8888;">Could not load accounts. Please contact support.</p>';
+        }
+    }
+
+    function escapeHtml(str) {
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    async function activateBot(botId) {
+        const containerId = `paypal-container-${botId}`;
+        const botCard = document.querySelector(`.bot-card[data-id="${botId}"]`);
+        const actionsDiv = botCard.querySelector('.bot-actions');
+        const tempDiv = document.createElement('div');
+        tempDiv.id = containerId;
+        tempDiv.style.marginTop = '10px';
+        actionsDiv.innerHTML = '';
+        actionsDiv.appendChild(tempDiv);
+
+        paypal.Buttons({
+            style: { shape: 'pill', color: 'black', layout: 'horizontal', label: 'subscribe' },
+            createSubscription: function(data, actions) {
+                return actions.subscription.create({
+                    plan_id: 'P-88J030708J570661LNHFHAFY',
+                    quantity: 1
+                });
+            },
+            onApprove: function(data, actions) {
+                fetch(`/api/bots/${botId}/activate-subscription`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ subscriptionID: data.subscriptionID }),
+                    credentials: 'include'
+                }).then(() => {
+                    alert('Bot activated! Monthly subscription started.');
+                    loadBots();
+                }).catch(() => {
+                    alert('Error activating bot');
+                });
+            },
+            onCancel: () => {
+                loadBots();
+            }
+        }).render(`#${containerId}`);
+    }
+
+    async function cancelSubscription(botId) {
+        if (!confirm('Cancel the monthly subscription for this bot? This will deactivate the bot.')) return;
+        const res = await fetch(`/api/bots/${botId}/cancel-subscription`, { method: 'POST', credentials: 'include' });
+        if (res.ok) {
+            alert('Subscription cancelled.');
+            loadBots();
+        } else {
+            alert('Error cancelling subscription.');
+        }
+    }
+
+    async function deleteBot(botId) {
+        if (!confirm('Delete this bot permanently? This will also cancel any active subscription.')) return;
+        const res = await fetch(`/api/bots/${botId}`, { method: 'DELETE', credentials: 'include' });
+        if (res.ok) {
+            alert('Bot deleted.');
+            loadBots();
+        } else {
+            alert('Error deleting bot.');
+        }
+    }
+
+    // Login action
+    document.getElementById('login-btn').addEventListener('click', async () => {
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const res = await fetch('/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+            credentials: 'include'
+        });
+        if (res.ok) {
+            window.location.href = '/dashboard';
+        } else {
+            loginError.textContent = 'Invalid username or password';
+        }
+    });
+
+    // Add bot
+    document.getElementById('add-bot-btn').addEventListener('click', async () => {
+        const name = document.getElementById('new-bot-name').value.trim();
+        if (!name) {
+            alert('Please enter a bot name');
+            return;
+        }
+        const res = await fetch('/api/bots', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name }),
+            credentials: 'include'
+        });
+        if (res.ok) {
+            document.getElementById('new-bot-name').value = '';
+            loadBots();
+        } else {
+            alert('Error adding bot');
+        }
+    });
+
+    // Logout
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+        const res = await fetch('/logout', { method: 'POST', credentials: 'include' });
+        if (res.ok) {
+            window.location.href = '/';
+        } else {
+            alert('Logout failed');
+        }
+    });
+
+    // Handle browser back/forward buttons
+    window.addEventListener('popstate', () => {
+        checkAuth();
+    });
+
+    // Initial auth check
+    checkAuth();
+</script>
+</body>
+</html>
