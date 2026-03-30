@@ -1,8 +1,24 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 
-// Use persistent disk if running on Render
-const dbPath = process.env.RENDER ? '/data/data.db' : path.join(__dirname, 'data.db');
+// Determine database path
+let dbPath;
+if (process.env.RENDER) {
+    // On Render, use the persistent disk mounted at /data
+    dbPath = '/data/data.db';
+} else {
+    // Local development: store in project root
+    dbPath = path.join(__dirname, 'data.db');
+}
+
+// Ensure the directory exists (especially for /data)
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+}
+
+// Open database (creates file if it doesn't exist)
 const db = new Database(dbPath);
 
 // Enable foreign keys
@@ -28,9 +44,9 @@ db.exec(`
 `);
 
 // Insert the single user if not exists
-const user = db.prepare('SELECT id FROM users WHERE username = ?').get('KG_Kgomotso');
-if (!user) {
-  db.prepare('INSERT INTO users (username, password) VALUES (?, ?)').run('KG_Kgomotso', 'KgomotsoAuto16&');
+const existingUser = db.prepare('SELECT id FROM users WHERE username = ?').get('KG_Kgomotso');
+if (!existingUser) {
+    db.prepare('INSERT INTO users (username, password) VALUES (?, ?)').run('KG_Kgomotso', 'KgomotsoAuto16&');
 }
 
 module.exports = db;
