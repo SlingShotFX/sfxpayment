@@ -1,41 +1,36 @@
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 const path = require('path');
 
+// Use persistent disk if running on Render
 const dbPath = process.env.RENDER ? '/data/data.db' : path.join(__dirname, 'data.db');
-const db = new sqlite3.Database(dbPath);
+const db = new Database(dbPath);
 
-db.serialize(() => {
-  // Users table – single user with provided credentials
-  db.run(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE,
-      password TEXT
-    )
-  `);
+// Enable foreign keys
+db.pragma('foreign_keys = ON');
 
-  // Bots table – each bot belongs to a user, has its own subscription
-  db.run(`
-    CREATE TABLE IF NOT EXISTS bots (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      name TEXT,
-      subscription_status TEXT DEFAULT 'inactive',
-      subscription_id TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-    )
-  `);
+// Create tables
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE,
+    password TEXT
+  );
 
-  // Insert the single user if not exists
-  db.get('SELECT id FROM users WHERE username = ?', ['KG_Kgomotso'], (err, row) => {
-    if (!row) {
-      db.run(
-        'INSERT INTO users (username, password) VALUES (?, ?)',
-        ['KG_Kgomotso', 'KgomotsoAuto16&']
-      );
-    }
-  });
-});
+  CREATE TABLE IF NOT EXISTS bots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    name TEXT,
+    subscription_status TEXT DEFAULT 'inactive',
+    subscription_id TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+`);
+
+// Insert the single user if not exists
+const user = db.prepare('SELECT id FROM users WHERE username = ?').get('KG_Kgomotso');
+if (!user) {
+  db.prepare('INSERT INTO users (username, password) VALUES (?, ?)').run('KG_Kgomotso', 'KgomotsoAuto16&');
+}
 
 module.exports = db;
