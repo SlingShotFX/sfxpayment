@@ -1,35 +1,37 @@
 const express = require('express');
 const session = require('express-session');
-const db = require('./db');
 const path = require('path');
 const axios = require('axios');
 const fs = require('fs');
 require('dotenv').config();
+
+const db = require('./db'); // PostgreSQL pool
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Session configuration
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false,
-    path: '/'   // essential for cross‑path cookie sharing
+    secure: false, // set to true if using HTTPS
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/'
   }
 }));
 
-// Authentication middleware
+// Helper: check authentication
 function isAuthenticated(req, res, next) {
   if (req.session.userId) return next();
   res.status(401).send('Unauthorized');
 }
 
-// ------------------ LOGIN ------------------
-
-
+// ------------------ LOGIN / LOGOUT ------------------
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -50,7 +52,10 @@ app.post('/login', async (req, res) => {
 
 app.post('/logout', (req, res) => {
   req.session.destroy((err) => {
-    if (err) return res.status(500).send('Logout failed');
+    if (err) {
+      console.error('Logout error:', err);
+      return res.status(500).send('Logout failed');
+    }
     res.clearCookie('connect.sid', { path: '/' });
     res.send('OK');
   });
@@ -64,7 +69,12 @@ async function getPayPalAccessToken() {
   const response = await axios.post(
     `https://api-m.${process.env.PAYPAL_MODE === 'live' ? 'paypal.com' : 'sandbox.paypal.com'}/v1/oauth2/token`,
     'grant_type=client_credentials',
-    { headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' } }
+    {
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    }
   );
   return response.data.access_token;
 }
@@ -79,51 +89,42 @@ app.get('/api/bots', isAuthenticated, async (req, res) => {
     );
     res.json(result.rows);
   } catch (err) {
+    console.error('GET /api/bots error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // Add a new bot (free)
-app.post('/api/bots', isAuthenticated, (req, res) => {
+app.post('/api/bots', isAuthenticated, async (req, res) => {
   const { name } = req.body;
   if (!name) return res.status(400).send('Bot name required');
-  db.run(
-    'INSERT INTO bots (user_id, name, subscription_status) VALUES (?, ?, ?)',
-    [req.session.userId, name, 'inactive'],
-    function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json({ id: this.lastID });
-    }
-  );
-});
-
-app.get('/api/accounts', isAuthenticated, (req, res) => {
-    const filePath = path.join(__dirname, '1', 'configs', 'account.txt');
-    fs.readFile(filePath, 'utf8', (err, data) => {
-        if (err) {
-            console.error('Error reading account.txt:', err);
-            return res.status(500).json({ error: 'Could not read accounts file' });
-        }
-        const accounts = data.split(/\r?\n/)
-            .map(line => line.trim())
-            .filter(line => line !== '' && !line.startsWith('#'));
-        res.json(accounts);
-    });
+  try {
+    const result = await db.query(
+      'INSERT INTO bots (user_id, name, subscription_status) VALUES ($1, $2, $3) RETURNING id',
+      [req.session.userId, name, 'inactive']
+    );
+    res.json({ id: result.rows[0].id });
+  } catch (err) {
+    console.error('POST /api/bots error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Delete a bot (also cancel its subscription if active)
 app.delete('/api/bots/:id', isAuthenticated, async (req, res) => {
   const botId = req.params.id;
   try {
-    // First, check if bot has an active subscription
-    const bot = await new Promise((resolve, reject) => {
-      db.get('SELECT subscription_id, subscription_status FROM bots WHERE id = ? AND user_id = ?', [botId, req.session.userId], (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
-      });
-    });
-    if (bot && bot.subscription_status === 'active' && bot.subscription_id) {
-      // Cancel the PayPal subscription
+    // Get bot subscription info
+    const botResult = await db.query(
+      'SELECT subscription_id, subscription_status FROM bots WHERE id = $1 AND user_id = $2',
+      [botId, req.session.userId]
+    );
+    if (botResult.rows.length === 0) {
+      return res.status(404).send('Bot not found');
+    }
+    const bot = botResult.rows[0];
+    if (bot.subscription_status === 'active' && bot.subscription_id) {
+      // Cancel PayPal subscription
       const accessToken = await getPayPalAccessToken();
       await axios.post(
         `https://api-m.${process.env.PAYPAL_MODE === 'live' ? 'paypal.com' : 'sandbox.paypal.com'}/v1/billing/subscriptions/${bot.subscription_id}/cancel`,
@@ -131,75 +132,101 @@ app.delete('/api/bots/:id', isAuthenticated, async (req, res) => {
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
     }
-    // Delete bot from database
-    db.run('DELETE FROM bots WHERE id = ? AND user_id = ?', [botId, req.session.userId], function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      res.sendStatus(200);
-    });
-  } catch (error) {
-    console.error(error);
+    // Delete bot
+    await db.query('DELETE FROM bots WHERE id = $1 AND user_id = $2', [botId, req.session.userId]);
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('DELETE /api/bots/:id error:', err);
     res.status(500).send('Error deleting bot');
   }
 });
 
-// Create a PayPal subscription for a specific bot
-app.post('/api/bots/:id/create-subscription', isAuthenticated, (req, res) => {
-  // This endpoint returns the PayPal subscription creation details.
-  // We'll use the frontend SDK to create the subscription, but we need to pass the bot id.
-  // The frontend will call this to get the bot ID, but actually we can just let the frontend
-  // create the subscription and then call /api/bots/:id/activate-subscription.
-  // So we'll just return a success message; the actual subscription creation happens on the frontend.
-  res.json({ botId: req.params.id });
-});
-
-// Activate subscription for a bot (store subscription ID)
-app.post('/api/bots/:id/activate-subscription', isAuthenticated, (req, res) => {
+// Activate subscription for a bot
+app.post('/api/bots/:id/activate-subscription', isAuthenticated, async (req, res) => {
   const { subscriptionID } = req.body;
   const botId = req.params.id;
-  db.run(
-    'UPDATE bots SET subscription_id = ?, subscription_status = ? WHERE id = ? AND user_id = ?',
-    [subscriptionID, 'active', botId, req.session.userId],
-    function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      res.sendStatus(200);
-    }
-  );
+  try {
+    await db.query(
+      'UPDATE bots SET subscription_id = $1, subscription_status = $2 WHERE id = $3 AND user_id = $4',
+      [subscriptionID, 'active', botId, req.session.userId]
+    );
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('POST /api/bots/:id/activate-subscription error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Cancel subscription for a bot (call PayPal and update DB)
+// Cancel subscription for a bot
 app.post('/api/bots/:id/cancel-subscription', isAuthenticated, async (req, res) => {
   const botId = req.params.id;
   try {
-    const bot = await new Promise((resolve, reject) => {
-      db.get('SELECT subscription_id FROM bots WHERE id = ? AND user_id = ?', [botId, req.session.userId], (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
-      });
-    });
-    if (!bot || !bot.subscription_id) {
+    const botResult = await db.query(
+      'SELECT subscription_id FROM bots WHERE id = $1 AND user_id = $2',
+      [botId, req.session.userId]
+    );
+    if (botResult.rows.length === 0 || !botResult.rows[0].subscription_id) {
       return res.status(400).send('No active subscription found');
     }
+    const subscriptionId = botResult.rows[0].subscription_id;
     const accessToken = await getPayPalAccessToken();
     await axios.post(
-      `https://api-m.${process.env.PAYPAL_MODE === 'live' ? 'paypal.com' : 'sandbox.paypal.com'}/v1/billing/subscriptions/${bot.subscription_id}/cancel`,
+      `https://api-m.${process.env.PAYPAL_MODE === 'live' ? 'paypal.com' : 'sandbox.paypal.com'}/v1/billing/subscriptions/${subscriptionId}/cancel`,
       { reason: 'Cancelled by user' },
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
-    db.run('UPDATE bots SET subscription_status = ?, subscription_id = NULL WHERE id = ? AND user_id = ?', ['cancelled', botId, req.session.userId]);
+    await db.query(
+      'UPDATE bots SET subscription_status = $1, subscription_id = NULL WHERE id = $2 AND user_id = $3',
+      ['cancelled', botId, req.session.userId]
+    );
     res.sendStatus(200);
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    console.error('POST /api/bots/:id/cancel-subscription error:', err);
     res.status(500).send('Error cancelling subscription');
   }
 });
 
-const port = process.env.PORT || 3000;
-
-// All API routes (GET/POST /api/...) come before this
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// ------------------ ACCOUNTS ENDPOINT ------------------
+app.get('/api/accounts', isAuthenticated, (req, res) => {
+  const filePath = path.join(__dirname, 'ExoMarkets', '1', 'configs', 'account.txt');
+  fs.readFile(filePath, 'utf8', (err, data) => {
+    if (err) {
+      console.error('Error reading account.txt:', err);
+      return res.status(500).json({ error: 'Could not read accounts file' });
+    }
+    const accounts = data.split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(line => line !== '' && !line.startsWith('#'));
+    res.json(accounts);
+  });
 });
 
+// ------------------ SUBSCRIPTION STATUS (for frontend) ------------------
+app.get('/api/subscription-status', isAuthenticated, async (req, res) => {
+  try {
+    // This endpoint returns the subscription status of the user (not per bot).
+    // For simplicity, we return the status of the first bot? Or we can check if any bot is active.
+    // In your original design, subscription is per bot. But frontend may expect a global status.
+    // To avoid confusion, we'll return a global flag based on whether the user has at least one active bot.
+    const result = await db.query(
+      'SELECT EXISTS(SELECT 1 FROM bots WHERE user_id = $1 AND subscription_status = $2) as has_active',
+      [req.session.userId, 'active']
+    );
+    const hasActive = result.rows[0].has_active;
+    res.json({ status: hasActive ? 'active' : 'inactive', subscriptionID: null });
+  } catch (err) {
+    console.error('GET /api/subscription-status error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ------------------ CATCH-ALL FOR SPA ROUTING ------------------
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// ------------------ START SERVER ------------------
+const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`Server listening at http://localhost:${port}`);
 });
