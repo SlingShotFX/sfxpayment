@@ -1,52 +1,60 @@
-const Database = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
+const { Pool } = require('pg');
 
-// Determine database path
-let dbPath;
-if (process.env.RENDER) {
-    // On Render, use the persistent disk mounted at /data
-    dbPath = '/data/data.db';
+let pool;
+
+// Use DATABASE_URL from environment (Render sets this automatically)
+if (process.env.DATABASE_URL) {
+  // Render PostgreSQL
+  pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false } // required for Render
+  });
 } else {
-    // Local development: store in project root
-    dbPath = path.join(__dirname, 'data.db');
+  // Local development – you can set DATABASE_URL in your .env file
+  console.error('DATABASE_URL not set. Using fallback.');
+  // Optional fallback to a local SQLite or similar
+  process.exit(1);
 }
 
-// Ensure the directory exists (especially for /data)
-const dbDir = path.dirname(dbPath);
-if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
+// Create tables and seed the default user
+async function initDb() {
+  const client = await pool.connect();
+  try {
+    // Create users table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username TEXT UNIQUE,
+        password TEXT
+      )
+    `);
+
+    // Create bots table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS bots (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT,
+        subscription_status TEXT DEFAULT 'inactive',
+        subscription_id TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Insert default user if not exists
+    const existing = await client.query('SELECT id FROM users WHERE username = $1', ['KG_Kgomotso']);
+    if (existing.rows.length === 0) {
+      await client.query(
+        'INSERT INTO users (username, password) VALUES ($1, $2)',
+        ['KG_Kgomotso', 'KgomotsoAuto16&']
+      );
+    }
+  } finally {
+    client.release();
+  }
 }
 
-// Open database (creates file if it doesn't exist)
-const db = new Database(dbPath);
+// Run the initialization (non-blocking)
+initDb().catch(console.error);
 
-// Enable foreign keys
-db.pragma('foreign_keys = ON');
-
-// Create tables
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE,
-    password TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS bots (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    name TEXT,
-    subscription_status TEXT DEFAULT 'inactive',
-    subscription_id TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
-  );
-`);
-
-// Insert the single user if not exists
-const existingUser = db.prepare('SELECT id FROM users WHERE username = ?').get('KG_Kgomotso');
-if (!existingUser) {
-    db.prepare('INSERT INTO users (username, password) VALUES (?, ?)').run('KG_Kgomotso', 'KgomotsoAuto16&');
-}
-
-module.exports = db;
+module.exports = pool;
