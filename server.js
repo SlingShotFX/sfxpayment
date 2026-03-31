@@ -188,7 +188,7 @@ app.post('/api/bots/:id/cancel-subscription', isAuthenticated, async (req, res) 
 
 // ------------------ ACCOUNTS ENDPOINT ------------------
 app.get('/api/accounts', isAuthenticated, (req, res) => {
-  const filePath = path.join(__dirname, 'ExoMarkets', '1', 'configs', 'account.txt');
+  const filePath = path.join(__dirname, '1', 'configs', 'account.txt');
   fs.readFile(filePath, 'utf8', (err, data) => {
     if (err) {
       console.error('Error reading account.txt:', err);
