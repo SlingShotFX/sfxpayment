@@ -62,10 +62,13 @@ async function getPayPalAccessToken() {
 
 // ------------------ BOT MANAGEMENT ------------------
 // Get all bots for the logged-in user
-app.get('/api/bots', isAuthenticated, (req, res) => {
+app.get('/api/bots', isAuthenticated, async (req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM bots WHERE user_id = ? ORDER BY created_at DESC').all(req.session.userId);
-    res.json(rows);
+    const result = await db.query(
+      'SELECT * FROM bots WHERE user_id = $1 ORDER BY created_at DESC',
+      [req.session.userId]
+    );
+    res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
