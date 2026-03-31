@@ -1,7 +1,0 @@
-{
-  "port": 5123,
-  "server_name": "MasterSignalServer",
-  "master_balance": 10000,
-  "comment": "German Auto",
-  "start_paused": false
-}
