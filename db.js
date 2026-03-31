@@ -4,11 +4,11 @@ let pool;
 if (process.env.DATABASE_URL) {
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false } // Required for Render
+    ssl: { rejectUnauthorized: false }
   });
 } else {
   console.error('DATABASE_URL environment variable is not set.');
-  process.exit(1); // Exit if no database connection
+  process.exit(1);
 }
 
 // Initialize tables and default user
