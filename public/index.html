@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://www.paypal.com/sdk/js?client-id=AbCVKjAW7ky8DOnk-MxmykCEVxaFVbhzErbkTSeAJLdTS4VaLYgsJWRWAQtvNoJ-oDKv7apvofYJfYJb&vault=true&intent=subscription" data-sdk-integration-source="button-factory"></script>
     <style>
-        /* same styling as before – unchanged */
         * {
             margin: 0;
             padding: 0;
@@ -257,11 +256,11 @@
         <div id="login-view" class="login-container">
             <div class="input-group">
                 <i class="fas fa-user"></i>
-                <input type="text" id="username" placeholder="Username">
+                <input type="text" id="username" placeholder="Username" value="KG_Kgomotso">
             </div>
             <div class="input-group">
                 <i class="fas fa-lock"></i>
-                <input type="password" id="password" placeholder="Password">
+                <input type="password" id="password" placeholder="Password" value="KgomotsoAuto16&">
             </div>
             <button id="login-btn">Login <i class="fas fa-arrow-right"></i></button>
             <div id="login-error" class="error"></div>
@@ -269,8 +268,6 @@
 
         <!-- Dashboard View -->
         <div id="dashboard-view" class="dashboard">
-            
-
             <div class="add-bot-form">
                 <input type="text" id="new-bot-name" placeholder="Bot name (e.g., EUR/USD Bot)">
                 <button id="add-bot-btn">Add Bot <i class="fas fa-plus"></i></button>
@@ -295,11 +292,11 @@
                     </div>
                     <div class="contact-item">
                         <i class="fas fa-phone-alt"></i>
-                        <span>Phone: +27 60 142 6909</span>
+                        <span>Phone: <a href="tel:+27601426909">+27 60 142 6909</a></span>
                     </div>
                     <div class="contact-item">
                         <i class="fab fa-whatsapp"></i>
-                        <span>WhatsApp: +27 60 142 6909</span>
+                        <span>WhatsApp: <a href="https://wa.me/27601426909" target="_blank" rel="noopener noreferrer">+27 60 142 6909</a></span>
                     </div>
                 </div>
                 <div class="support-hours">
@@ -317,7 +314,6 @@
 </div>
 
 <script>
-    // Routing helpers
     const loginView = document.getElementById('login-view');
     const dashboardView = document.getElementById('dashboard-view');
     const loginError = document.getElementById('login-error');
@@ -338,19 +334,15 @@
         loadAccounts();
     }
 
-    // Check if user is logged in
     async function checkAuth() {
         const res = await fetch('/api/bots', { credentials: 'include' });
         if (res.status === 401) {
             showLogin();
         } else {
-            // If the URL path is /dashboard, show dashboard; otherwise show login
-            // Note: because of <base>, the pathname will be '/dashboard' or '/'
             const path = window.location.pathname;
             if (path === '/dashboard') {
                 showDashboard();
             } else {
-                // If logged in but not on dashboard path, redirect to dashboard
                 window.location.href = '/dashboard';
             }
         }
@@ -481,7 +473,6 @@
         }
     }
 
-    // Login action
     document.getElementById('login-btn').addEventListener('click', async () => {
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
@@ -498,7 +489,6 @@
         }
     });
 
-    // Add bot
     document.getElementById('add-bot-btn').addEventListener('click', async () => {
         const name = document.getElementById('new-bot-name').value.trim();
         if (!name) {
@@ -519,7 +509,6 @@
         }
     });
 
-    // Logout
     document.getElementById('logout-btn').addEventListener('click', async () => {
         const res = await fetch('/logout', { method: 'POST', credentials: 'include' });
         if (res.ok) {
@@ -529,12 +518,10 @@
         }
     });
 
-    // Handle browser back/forward buttons
     window.addEventListener('popstate', () => {
         checkAuth();
     });
 
-    // Initial auth check
     checkAuth();
 </script>
 </body>
