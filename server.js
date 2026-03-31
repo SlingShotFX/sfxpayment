@@ -28,15 +28,24 @@ function isAuthenticated(req, res, next) {
 }
 
 // ------------------ LOGIN ------------------
-app.post('/login', (req, res) => {
+
+
+app.post('/login', async (req, res) => {
   const { username, password } = req.body;
-  db.get('SELECT id FROM users WHERE username = ? AND password = ?', [username, password], (err, user) => {
-    if (err || !user) {
+  try {
+    const result = await db.query(
+      'SELECT id FROM users WHERE username = $1 AND password = $2',
+      [username, password]
+    );
+    if (result.rows.length === 0) {
       return res.status(401).send('Invalid credentials');
     }
-    req.session.userId = user.id;
+    req.session.userId = result.rows[0].id;
     res.send('OK');
-  });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).send('Internal server error');
+  }
 });
 
 app.post('/logout', (req, res) => {
